@@ -629,9 +629,41 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       case false => tags.readSync(tagsReadCmd.payload, tagsReadCmd.valid && !io.cpu.memory.isStuck)
       case true => tags.readAsync(RegNextWhen(tagsReadCmd.payload, io.cpu.execute.isValid && !io.cpu.memory.isStuck))
     }
-    val dataReadRspMem = data.readSync(dataReadCmd.payload, dataReadCmd.valid && !io.cpu.memory.isStuck)
-    val dataReadRspSel = if(mergeExecuteMemory) io.cpu.writeBack.address else io.cpu.memory.address
-    val dataReadRsp = dataReadRspMem.subdivideIn(cpuDataWidth bits).read(dataReadRspSel(memWordToCpuWordRange))
+    //val dataReadRspMem = data.readSync(dataReadCmd.payload, dataReadCmd.valid && !io.cpu.memory.isStuck)
+    //val dataReadRspSel = if(mergeExecuteMemory) io.cpu.writeBack.address else io.cpu.memory.address
+    //val dataReadRsp = dataReadRspMem.subdivideIn(cpuDataWidth bits).read(dataReadRspSel(memWordToCpuWordRange))
+
+    val dataBankWrapper = new Area{
+      val we = dataWriteCmd.valid && dataWriteCmd.way(i)
+      val re = (dataReadCmd.valid && !io.cpu.memory.isStuck) ^ we
+      val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
+      when(we)
+      {
+          AccessAddr := dataWriteCmd.address
+      }
+      .elsewhen(re)
+      {
+          AccessAddr := dataReadCmd.payload
+      }
+      .otherwise
+      {
+          AccessAddr := U(0)
+      }
+      val din = dataWriteCmd.data
+
+      val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
+
+      val dout = data.readSync(AccessAddr, re)
+      when(we){
+      data.write(
+        address = dataWriteCmd.address,
+        data = dataWriteCmd.data
+      )
+    }
+      
+      val valid_dout = RegNext(we || re)
+    }
+
 
     val tagsInvReadRsp = withInvalidate generate(asyncTagMemory match {
       case false => tags.readSync(tagsInvReadCmd.payload, tagsInvReadCmd.valid)
@@ -642,13 +674,13 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     when(tagsWriteCmd.valid && tagsWriteCmd.way(i)){
       tags.write(tagsWriteCmd.address, tagsWriteCmd.data)
     }
-    when(dataWriteCmd.valid && dataWriteCmd.way(i)){
+    /*when(dataWriteCmd.valid && dataWriteCmd.way(i)){
       data.write(
         address = dataWriteCmd.address,
         data = dataWriteCmd.data,
         mask = dataWriteCmd.mask
       )
-    }
+    }*/
   }
 
 
@@ -806,7 +838,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       wayHits := (io.cpu.memory.mmuRsp.bypassTranslation ? bypassHits | translatedHits) & B(ways.map(_.tagsReadRsp.valid))
     }
 
-    val dataMux = earlyDataMux generate MuxOH(wayHits, ways.map(_.dataReadRsp))
+    val dataMux = earlyDataMux generate MuxOH(wayHits, ways.map(_.dataBankWrapper.dout))
     val wayInvalidate = stagePipe(stage0. wayInvalidate)
     val dataColisions = if(mergeExecuteMemory){
       stagePipe(stage0.dataColisions)
@@ -823,7 +855,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val mmuRspFreeze = False
     val mmuRsp = RegNextWhen(io.cpu.memory.mmuRsp, !io.cpu.writeBack.isStuck && !mmuRspFreeze)
     val tagsReadRsp = ways.map(w => ramPipe(w.tagsReadRsp))
-    val dataReadRsp = !earlyDataMux generate ways.map(w => ramPipe(w.dataReadRsp))
+    val dataReadRsp = !earlyDataMux generate ways.map(w => ramPipe(w.dataBankWrapper.dout))
     val wayInvalidate = stagePipe(stageA. wayInvalidate)
     val consistancyHazard = if(stageA.consistancyCheck != null) stagePipe(stageA.consistancyCheck.hazard) else False
     val dataColisions = stagePipe(stageA.dataColisions)
