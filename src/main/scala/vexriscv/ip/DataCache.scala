@@ -635,8 +635,14 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
     val dataBankWrapper = new Area{
       val we = dataWriteCmd.valid && dataWriteCmd.way(i)
-      val re = (dataReadCmd.valid && !io.cpu.memory.isStuck) ^ we
+      val re = (dataReadCmd.valid && !io.cpu.memory.isStuck) && !we
       val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
+      val timer = Counter(4)
+      val timerTicks = RegInit(False) setWhen(re.rise() || we.rise()) clearWhen(timer.willOverflow)
+      when(timerTicks)
+      {
+        timer.increment()
+      }
       when(we)
       {
           AccessAddr := dataWriteCmd.address
@@ -654,14 +660,15 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
 
       val dout = data.readSync(AccessAddr, re)
-      when(we){
+      val doutReg = RegNextWhen(dout, timer.value === (3))
+      when(we && timer.value === 3){
       data.write(
         address = dataWriteCmd.address,
         data = dataWriteCmd.data
       )
     }
       
-      val valid_dout = RegNext(we || re)
+      val valid_dout = timer.willOverflow
     }
 
 
