@@ -638,7 +638,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       val re = (dataReadCmd.valid && !io.cpu.memory.isStuck) && !we
       val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
       val timer = Counter(4)
-      val timerTicks = RegInit(False) setWhen(re.rise() || we.rise()) clearWhen(timer.willOverflow)
+      val timerTicks = RegInit(False) setWhen(re || we) clearWhen((timer.willOverflow && !re) && !we)
       when(timerTicks)
       {
         timer.increment()
@@ -655,20 +655,23 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       {
           AccessAddr := U(0)
       }
+
+      val addrReg = RegNextWhen(AccessAddr, we || re)
       val din = dataWriteCmd.data
+      val dinReg = RegNextWhen(din, we)
 
       val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
 
-      val dout = data.readSync(AccessAddr, re)
+      val dout = data.readSync(addrReg, RegNext(re))
       val doutReg = RegNextWhen(dout, timer.value === (3))
       when(we && timer.value === 3){
       data.write(
-        address = dataWriteCmd.address,
-        data = dataWriteCmd.data
+        address = addrReg,
+        data = dinReg
       )
     }
       
-      val valid_dout = timer.willOverflow
+      val valid_dout = RegNext(timer.willOverflow)
     }
 
 
