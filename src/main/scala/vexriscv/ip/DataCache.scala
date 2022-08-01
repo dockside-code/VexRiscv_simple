@@ -570,6 +570,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
   val io = new Bundle{
     val cpu = slave(DataCacheCpuBus(p, mmuParameter))
     val mem = master(DataCacheMemBus(p))
+    val all_ready = out UInt(1 bits)
   }
 
   val haltCpu = False
@@ -622,7 +623,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
   val ways = for(i <- 0 until wayCount) yield new Area{
     val tags = Mem(new LineInfo(), wayLineCount)
-    val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
+    //val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
 
     //Reads
     val tagsReadRsp = asyncTagMemory match {
@@ -634,11 +635,13 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     //val dataReadRsp = dataReadRspMem.subdivideIn(cpuDataWidth bits).read(dataReadRspSel(memWordToCpuWordRange))
 
     val dataBankWrapper = new Area{
-      val we = dataWriteCmd.valid && dataWriteCmd.way(i)
-      val re = (dataReadCmd.valid && !io.cpu.memory.isStuck) && !we
-      val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
+
       val timer = Counter(4)
-      val timerTicks = RegInit(False) setWhen(re || we) clearWhen((timer.willOverflow && !re) && !we)
+      val we = RegInit(False) setWhen(dataWriteCmd.valid && dataWriteCmd.way(i)) clearWhen(timer.willOverflow)
+      val re = RegInit(False) setWhen((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we) clearWhen(timer.willOverflow)
+      val timerTicks = RegInit(False) setWhen(re || we) clearWhen((timer.willOverflow && !re) && !we)   //need to extend re/we
+      val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
+      
       when(timerTicks)
       {
         timer.increment()
@@ -693,6 +696,33 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     }*/
   }
 
+  val ways_ready = ways.map(w => w.dataBankWrapper.valid_dout)
+  val all_ready = ways_ready.reduce((x, y) => x || y) 
+  io.all_ready := all_ready.asUInt
+
+  val dBusBuffer = new Area{
+    val in_counter = Counter(memTransactionPerLine)
+    //val out_counter = Counter(memTransactionPerLine)
+    val burst_buffer = Mem(Bits(memDataWidth bit), memTransactionPerLine)
+    //val out_addr = UInt(log2Up(memTransactionPerLine) bits)
+    //val out_data = UInt(memDataWidth bit)
+
+    when(io.mem.rsp.valid)
+    {
+      in_counter.increment()
+      burst_buffer.write(
+        address = in_counter.value,
+        data = io.mem.rsp.data
+      )
+    }
+    //when(all_ready)
+    //{
+      //out_counter.increment()
+      
+    //}
+    //val out_addr = out_counter.value
+    //val out_data = burst_buffer.readSync(out_counter.value, all_ready)
+  }
 
   tagsReadCmd.valid := False
   tagsReadCmd.payload.assignDontCare()
@@ -857,7 +887,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       stagePipe(stage0.dataColisions) | collisionProcess(io.cpu.memory.address(lineRange.high downto cpuWordRange.low), mask)
     }
   }
-
+  
   val stageB = new Area {
     def stagePipe[T <: Data](that : T) = RegNextWhen(that, !io.cpu.writeBack.isStuck)
     def ramPipe[T <: Data](that : T) = if(mergeExecuteMemory) CombInit(that) else  RegNextWhen(that, !io.cpu.writeBack.isStuck)
@@ -1132,10 +1162,15 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     when(valid && io.mem.rsp.valid && rspLast){
       dataWriteCmd.valid := True
       dataWriteCmd.address := baseAddress(lineRange) @@ counter
-      dataWriteCmd.data := io.mem.rsp.data
+      dataWriteCmd.data := dBusBuffer.burst_buffer.readSync(counter.value)
       dataWriteCmd.mask.setAll()
       dataWriteCmd.way := waysAllocator
       error := error | io.mem.rsp.error
+      //counter.increment()
+    }
+
+    when(valid && io.mem.rsp.valid && rspLast && all_ready)
+    {
       counter.increment()
     }
 
