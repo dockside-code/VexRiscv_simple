@@ -637,8 +637,10 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val dataBankWrapper = new Area{
 
       val timer = Counter(4)
-      val we = RegInit(False) setWhen(dataWriteCmd.valid && dataWriteCmd.way(i)) clearWhen(timer.willOverflow)
+      val we = RegInit(False) setWhen(dataWriteCmd.valid && dataWriteCmd.way(i)) clearWhen(timer.willOverflow) //stageB should take care of this!
       val re = RegInit(False) setWhen((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we) clearWhen(timer.willOverflow)
+      //val we = Bool
+      //val re = Bool
       val timerTicks = RegInit(False) setWhen(re || we) clearWhen((timer.willOverflow && !re) && !we)   //need to extend re/we
       val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
       
@@ -715,6 +717,8 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         data = io.mem.rsp.data
       )
     }
+
+    val buffer_ready = in_counter.willOverflow
     //when(all_ready)
     //{
       //out_counter.increment()
@@ -1148,6 +1152,14 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
     assert(!(io.cpu.writeBack.isValid && !io.cpu.writeBack.haltIt && io.cpu.writeBack.isStuck), "writeBack stuck by another plugin is not allowed", ERROR)
   }
+  val transactionManager = new Area{
+  val transactionCounter = Counter(memTransactionPerLine)
+  val transactionInProgress = RegInit(False) setWhen(dBusBuffer.buffer_ready) clearWhen(transactionCounter.willOverflow)
+  when(all_ready)
+  {
+    transactionCounter.increment()
+  }
+  }
 
   val loader = new Area{
     val valid = RegInit(False) setWhen(stageB.loaderValid)
@@ -1159,7 +1171,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val kill = False
     val killReg = RegInit(False) setWhen(kill)
 
-    when(valid && io.mem.rsp.valid && rspLast){
+    when(valid && transactionManager.transactionInProgress && rspLast){
       dataWriteCmd.valid := True
       dataWriteCmd.address := baseAddress(lineRange) @@ counter
       dataWriteCmd.data := dBusBuffer.burst_buffer.readSync(counter.value)
@@ -1169,7 +1181,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       //counter.increment()
     }
 
-    when(valid && io.mem.rsp.valid && rspLast && all_ready)
+    when(valid && transactionManager.transactionInProgress && rspLast && all_ready)
     {
       counter.increment()
     }
@@ -1185,7 +1197,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       tagsWriteCmd.address := baseAddress(lineRange)
       tagsWriteCmd.data.valid := !(kill || killReg)
       tagsWriteCmd.data.address := baseAddress(tagRange)
-      tagsWriteCmd.data.error := error || (io.mem.rsp.valid && io.mem.rsp.error)
+      tagsWriteCmd.data.error := error //|| (io.mem.rsp.valid && io.mem.rsp.error) no errors for u!
       tagsWriteCmd.way := waysAllocator
 
       error := False
