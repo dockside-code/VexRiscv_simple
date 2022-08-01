@@ -1155,7 +1155,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
   val transactionManager = new Area{
   val transactionCounter = Counter(memTransactionPerLine)
   val transactionInProgress = RegInit(False) setWhen(dBusBuffer.buffer_ready) clearWhen(transactionCounter.willOverflow)
-  when(all_ready)
+  when(all_ready && transactionInProgress)
   {
     transactionCounter.increment()
   }
