@@ -772,7 +772,8 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val stateB = new State
     val stateC = new State
 
-    
+    val we_reg = Reg(Bool)
+    val re_reg = Reg(Bool)
     
 
     stateA
@@ -788,11 +789,13 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       .onEntry
       {
         counter := 0
-        dinReg := din
+        //dinReg := din
         accessAddrReg := accessAddr
-        
+        we_reg := we
+        re_reg := re
       }
       .whenIsActive {
+        dinReg := din
         counter := counter + 1
         when(accessAddrReg > lastAddrReg)
         {
@@ -804,10 +807,13 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         }
         when(RegNext(counter) === addrDifference){
           dout := data.readSync(accessAddrReg)
+          when(we_reg)
+          {
           data.write(
           address = accessAddrReg,
           data = dinReg
           )
+          }
           lastAddrReg := accessAddrReg
           goto(stateA)
         }
