@@ -634,7 +634,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     //val dataReadRspSel = if(mergeExecuteMemory) io.cpu.writeBack.address else io.cpu.memory.address
     //val dataReadRsp = dataReadRspMem.subdivideIn(cpuDataWidth bits).read(dataReadRspSel(memWordToCpuWordRange))
 
-    val dataBankWrapper = new Area{
+    /*val dataBankWrapper = new Area{
 
       val timer = Counter(4)
       val we = RegInit(False) setWhen(dataWriteCmd.valid && dataWriteCmd.way(i)) clearWhen(timer.willOverflow) //stageB should take care of this!
@@ -677,6 +677,147 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     }
       
       val valid_dout = RegNext(timer.willOverflow)
+    }*/
+
+    /*val dataBankWrapper = new Area{
+
+      val timer = Counter(16)
+      val we = (dataWriteCmd.valid && dataWriteCmd.way(i) )//stageB should take care of this!
+      val re = ((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we)
+      val lastAddr = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
+      val accessAddr = Mux(we, dataWriteCmd.address, dataReadCmd.payload)
+      val accessAddrReg = RegNextWhen(accessAddr, we || re)
+      val ticker = Counter(2)
+      /*when(we)
+      {
+          accessAddr := dataWriteCmd.address
+      }
+      .elsewhen(re)
+      {
+          accessAddr := dataReadCmd.payload
+      }
+      .otherwise
+      {
+          accessAddr := U(0)
+      }*/
+
+      //val we = Bool
+      //val re = Bool
+      val addrDifference = Mux(lastAddr > accessAddrReg, lastAddr - accessAddrReg, accessAddrReg - lastAddr)
+
+      val timerTicks = timer.value < addrDifference
+
+      val timerHit = (timer.value === addrDifference) && (we || re)//&& (timer.value =/= 0)
+
+      when(timerHit.rise())
+      {
+        ticker.increment()
+      }
+      when(ticker.value === 1)
+      {
+        ticker.clear()
+      }
+      when(timerTicks)
+      {
+        timer.increment()
+      }
+      
+      /*val addrReg = RegNextWhen(AccessAddr, we || re)*/
+      val din = dataWriteCmd.data
+      /*val dinReg = RegNextWhen(din, we)*/
+
+      val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
+
+      val dout = data.readSync(accessAddrReg, timerHit)
+
+      val doutReg = RegNextWhen(dout, timerHit)
+
+      when(we && timerHit){
+      data.write(
+        address = accessAddrReg,
+        data = din
+      )
+    }
+    when(timerHit || (we.rise() || re.rise()))
+    {
+      //lastAddr := accessAddr
+      timer.clear()
+    }
+    when(we || re || timerHit.){
+      lastAddr := accessAddrReg
+    }
+      
+      val valid_dout = timerHit
+    }*/
+
+    import spinal.lib.fsm._
+    val dataBankWrapper = new Area{
+    
+    val counter = Reg(UInt(4 bits)) init (0)
+    val valid_dout = False
+    val dout = Reg(Bits(memDataWidth bit))
+    val dinReg = Reg(Bits(memDataWidth bit))
+    val din = dataWriteCmd.data
+
+    val we = (dataWriteCmd.valid && dataWriteCmd.way(i) )//stageB should take care of this!
+    val re = ((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we)
+    val lastAddrReg = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
+    val accessAddr = Mux(we, dataWriteCmd.address, dataReadCmd.payload)
+    val accessAddrReg = RegInit(U(0, log2Up(wayMemWordCount) bits)) 
+    val addrDifference = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
+    val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
+    
+    val fsm = new StateMachine{
+    val stateA = new State with EntryPoint
+    val stateB = new State
+    val stateC = new State
+
+    
+    
+
+    stateA
+      .whenIsActive 
+      {
+      when(we || re)
+      {
+        (goto(stateB))
+      }
+      }
+
+    stateB
+      .onEntry
+      {
+        counter := 0
+        dinReg := din
+        accessAddrReg := accessAddr
+        
+      }
+      .whenIsActive {
+        counter := counter + 1
+        when(accessAddrReg > lastAddrReg)
+        {
+          addrDifference := accessAddrReg - lastAddrReg
+        }
+        .otherwise
+        {
+          addrDifference := lastAddrReg - accessAddrReg
+        }
+        when(RegNext(counter) === addrDifference){
+          dout := data.readSync(accessAddrReg)
+          data.write(
+          address = accessAddrReg,
+          data = dinReg
+          )
+          lastAddrReg := accessAddrReg
+          goto(stateA)
+        }
+      }
+      .onExit(valid_dout := True)
+
+    //stateC
+    //  .whenIsActive (goto(stateA))
+  }
+    
     }
 
 
@@ -1155,7 +1296,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
   val transactionManager = new Area{
   val transactionCounter = Counter(memTransactionPerLine)
   val transactionInProgress = RegInit(False) setWhen(dBusBuffer.buffer_ready) clearWhen(transactionCounter.willOverflow)
-  when(all_ready && transactionInProgress)
+  when(all_ready.rise() && transactionInProgress)
   {
     transactionCounter.increment()
   }
@@ -1181,7 +1322,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       //counter.increment()
     }
 
-    when(valid && transactionManager.transactionInProgress && rspLast && all_ready)
+    when(valid && transactionManager.transactionInProgress && rspLast && all_ready.rise())
     {
       counter.increment()
     }

@@ -16,3 +16,9 @@
   1. Halt execution phase during cache read/write, and treat it like a memory access.  
   
   2. Make sure such pipeline stalls does not affect operations.
+
+- Model a Latency - Accurate RTM model
+  
+  1. In progress (using state machine, a few signals still out off line)
+  
+  2. I'm getting a headache so I'm heading home now (17:40 Aug 2nd Zhao)
