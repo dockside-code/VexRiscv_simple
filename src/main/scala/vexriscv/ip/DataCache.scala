@@ -571,6 +571,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val cpu = slave(DataCacheCpuBus(p, mmuParameter))
     val mem = master(DataCacheMemBus(p))
     val all_ready = out UInt(1 bits)
+    val halt_pipeline = out Bool()
   }
 
   val haltCpu = False
@@ -805,7 +806,11 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         {
           addrDifference := lastAddrReg - accessAddrReg
         }
-        when(RegNext(counter) === addrDifference){
+        when(we.rise() || re.rise())
+        {
+          goto(stateA)
+        }
+        .elsewhen(RegNext(counter) === addrDifference){
           dout := data.readSync(accessAddrReg)
           when(we_reg)
           {
@@ -816,15 +821,20 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
           }
           lastAddrReg := accessAddrReg
           goto(stateA)
+          valid_dout := True
         }
+        
       }
-      .onExit(valid_dout := True)
+      //.onExit(valid_dout := True)
+      
 
     //stateC
     //  .whenIsActive (goto(stateA))
   }
     
-    }
+  }//end databank
+
+
 
 
     val tagsInvReadRsp = withInvalidate generate(asyncTagMemory match {
@@ -846,7 +856,9 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
   }
 
   val ways_ready = ways.map(w => w.dataBankWrapper.valid_dout)
-  val all_ready = ways_ready.reduce((x, y) => x || y) 
+  val all_ready = ways_ready.reduce((x, y) => x || y)
+  val ways_re = ways.map(w => w.dataBankWrapper.re)
+  val all_re = ways_re.reduce((x, y) => x || y)  
   io.all_ready := all_ready.asUInt
 
   val dBusBuffer = new Area{
@@ -1360,6 +1372,13 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
     stageB.mmuRspFreeze setWhen(stageB.loaderValid || valid)
   }
+
+  val pipelineHaltManager = new Area{
+    //val readEnable = dataReadCmd.valid && !dataWriteCmd.valid
+    val halt = RegInit(False) setWhen(all_re) clearWhen(all_ready)
+  }
+  
+  io.halt_pipeline := pipelineHaltManager.halt
 
   val invalidate = withInvalidate generate new Area{
     val s0 = new Area{

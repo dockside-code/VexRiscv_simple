@@ -363,7 +363,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
       }
 
 
-      when(cache.io.cpu.execute.refilling && arbitration.isValid){
+      when((cache.io.cpu.execute.refilling || cache.io.halt_pipeline)){ //&& arbitration.isValid){
         arbitration.haltByOther := True
       }
 
