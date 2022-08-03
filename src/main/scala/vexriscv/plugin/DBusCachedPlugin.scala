@@ -401,7 +401,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
       cache.io.cpu.writeBack.isFiring := arbitration.isFiring
       cache.io.cpu.writeBack.isUser  := (if(privilegeService != null) privilegeService.isUser() else False)
       cache.io.cpu.writeBack.address := U(input(REGFILE_WRITE_DATA))
-      cache.io.cpu.writeBack.storeData.subdivideIn(32 bits).foreach(_ := input(MEMORY_STORE_DATA_RF))
+      cache.io.cpu.writeBack.storeData.subdivideIn(32 bits).foreach(_ := input(MEMORY_STORE_DATA_RF)) //this is definately fucking with me now!!
       afterElaboration(for((cond, value) <- bypassStoreList) when(cond){
         cache.io.cpu.writeBack.storeData.subdivideIn(widthOf(value) bits).foreach(_ := value) //Not optimal, but ok
       })

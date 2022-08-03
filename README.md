@@ -13,10 +13,13 @@
 
 - Correct Pipeline Timing:
 
-  1. Halt execution phase during cache read/write, and treat it like a memory access. (Attempt made. Timing seems to be correct. Pipeline didn't respond well)
+  1. Halt execution phase during cache read/write, and treat it like a memory access. (Attempt made. Timing seems to be correct. Pipeline didn't respond well, namely writeback data available was unaligned with writeback instruction)
   
   2. Make sure such pipeline stalls does not affect operations. (There might be a problem with writeback data)
 
 - Model a Latency - Accurate RTM model
   
-  1. In progress (Basically done. Latency porpotionate to relative distance between addresses for access. May contain still a few errors).
+  1. In progress (Basically done. Latency porpotionate to relative distance between addresses for access. May contain still a
+     few errors).
+
+- Construct a more conprehensive and illustraing test program  
