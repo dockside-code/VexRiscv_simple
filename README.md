@@ -4,7 +4,7 @@
   
   1. Hit, Read: Read from Cache (takes n cycles) (Basically done).
   
-  2. Hit, Write: Write to memory and cache (takes n cycles) (Not observable in current program).
+  2. Hit, Write: Write to memory and cache (takes n cycles) (Not observable in current program - In progress).
   
   3. No Hit, Write: Write Through (1 cycle due to write to BRAM) (done).
   
@@ -13,13 +13,13 @@
 
 - Correct Pipeline Timing:
 
-  1. Halt execution phase during cache read/write, and treat it like a memory access. (Attempt made. Timing seems to be correct. Pipeline didn't respond well, namely writeback data available was unaligned with writeback instruction)
+  1. Halt execution phase during cache read/write, and treat it like a memory access. (Kind of sorted out. Turns out I have to halt the writeback as well to get valid        writeback)
   
-  2. Make sure such pipeline stalls does not affect operations. (There might be a problem with writeback data)
+  2. Make sure such pipeline stalls does not affect operations. (Still need to do the write-to-cache-when-hit thing)
 
 - Model a Latency - Accurate RTM model
   
   1. In progress (Basically done. Latency porpotionate to relative distance between addresses for access. May contain still a
      few errors).
 
-- Construct a more conprehensive and illustraing test program  
+- Construct a more conprehensive and illustraing test program  (In progress)
