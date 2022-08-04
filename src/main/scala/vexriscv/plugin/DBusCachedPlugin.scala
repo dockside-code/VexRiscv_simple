@@ -363,7 +363,7 @@ class DBusCachedPlugin(val config : DataCacheConfig,
       }
 
 
-      when((cache.io.cpu.execute.refilling || cache.io.halt_pipeline)){ //&& arbitration.isValid){
+      when((cache.io.cpu.execute.refilling || cache.io.halt_pipeline)){ //&& arbitration.isValid)){
         arbitration.haltByOther := True
       }
 
@@ -463,8 +463,8 @@ class DBusCachedPlugin(val config : DataCacheConfig,
         }
       }
 
-      arbitration.haltItself.setWhen(cache.io.cpu.writeBack.isValid && cache.io.cpu.writeBack.haltIt)
-
+      arbitration.haltItself.setWhen((cache.io.cpu.writeBack.isValid && cache.io.cpu.writeBack.haltIt) || cache.io.halt_pipeline)
+      //need adjusting!!!!
       val rspSplits = cache.io.cpu.writeBack.data.subdivideIn(8 bits)
       val rspShifted = Bits(cpuDataWidth bits)
       //Generate minimal mux to move from a wide aligned memory read to the register file shifter representation

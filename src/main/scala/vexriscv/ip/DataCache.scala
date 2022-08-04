@@ -811,13 +811,17 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
           goto(stateA)
         }
         .elsewhen(RegNext(counter) === addrDifference){
-          dout := data.readSync(accessAddrReg)
+          
           when(we_reg)
           {
-          data.write(
-          address = accessAddrReg,
-          data = dinReg
+            data.write(
+            address = accessAddrReg,
+            data = dinReg
           )
+          }
+          .elsewhen(re_reg)
+          {
+            dout := data.readSync(accessAddrReg)
           }
           lastAddrReg := accessAddrReg
           goto(stateA)
@@ -1375,7 +1379,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
   val pipelineHaltManager = new Area{
     //val readEnable = dataReadCmd.valid && !dataWriteCmd.valid
-    val halt = RegInit(False) setWhen(all_re) clearWhen(all_ready)
+    val halt = RegInit(False) setWhen(all_re) clearWhen(RegNext(all_ready))
   }
   
   io.halt_pipeline := pipelineHaltManager.halt
