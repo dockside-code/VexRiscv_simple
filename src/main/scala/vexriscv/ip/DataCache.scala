@@ -863,6 +863,8 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
   val all_ready = ways_ready.reduce((x, y) => x || y)
   val ways_re = ways.map(w => w.dataBankWrapper.re)
   val all_re = ways_re.reduce((x, y) => x || y)  
+  val ways_we = ways.map(w => w.dataBankWrapper.we)
+  val all_we = ways_we.reduce((x, y) => x || y)  
   io.all_ready := all_ready.asUInt
 
   val dBusBuffer = new Area{
@@ -1379,10 +1381,10 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
   val pipelineHaltManager = new Area{
     //val readEnable = dataReadCmd.valid && !dataWriteCmd.valid
-    val halt = RegInit(False) setWhen(all_re) clearWhen(RegNext(all_ready))
+    val halt = RegInit(False) setWhen(all_re || all_we) clearWhen(RegNext(all_ready))
   }
   
-  io.halt_pipeline := pipelineHaltManager.halt
+  io.halt_pipeline := pipelineHaltManager.halt && !loader.valid
 
   val invalidate = withInvalidate generate new Area{
     val s0 = new Area{
