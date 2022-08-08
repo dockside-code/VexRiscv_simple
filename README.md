@@ -24,6 +24,6 @@
 
 - Construct a more conprehensive and illustraing test program  (In progress)
 
-  1. Seems to be a problem with the compiler. (Ivestigating, in progress)
+  1. Seems to be a problem with the compiler. (Investigating, in progress)
 
   2. Seems to be a problem? with the memory write mask (Investigating)
