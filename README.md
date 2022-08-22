@@ -44,7 +44,7 @@ The RTM model was implemented with a state machine. It enters counter incrementa
 
 The track length (max latency) is customizable, [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L756) as well as the cache line configs. (Multi - way configs are theoretically supported but not tested)
 
-The cache is programmed to halt the rest of the pipeline (execution and writeback) when:
+The cache is programmed to halt the rest of the pipeline (execution and writeback) when:  
 [See here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1389)
 
 - There's a refill process
