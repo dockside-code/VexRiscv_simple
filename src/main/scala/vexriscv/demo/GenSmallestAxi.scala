@@ -44,7 +44,7 @@ object GenSmallestAxi{
                     ),
                     new DBusCachedPlugin(
                             config = new DataCacheConfig(
-                            cacheSize        = 32,
+                            cacheSize        = 2048,
                             bytePerLine      = 32,
                             wayCount         = 1,
                             addressWidth     = 32,

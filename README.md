@@ -27,3 +27,5 @@
   1. Seems to be a problem with the compiler. (Investigating, in progress)
 
   2. Seems to be a problem? with the memory write mask (Investigating)
+
+  3. Looks like I'm wrong. Problem was probably casued by vivado simulation errors?

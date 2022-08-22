@@ -753,8 +753,9 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
     import spinal.lib.fsm._
     val dataBankWrapper = new Area{
-    
-    val counter = Reg(UInt(4 bits)) init (0)
+    val trackLength = 16
+    val addrBitCap = (log2Up(trackLength) - 1).min(log2Up(wayMemWordCount) - 1)
+    val counter = Reg(UInt((addrBitCap + 1) bits)) init (0)
     val valid_dout = False
     val dout = Reg(Bits(memDataWidth bit))
     val dinReg = Reg(Bits(memDataWidth bit))
@@ -765,7 +766,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val lastAddrReg = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
     val accessAddr = Mux(we, dataWriteCmd.address, dataReadCmd.payload)
     val accessAddrReg = RegInit(U(0, log2Up(wayMemWordCount) bits)) 
-    val addrDifference = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
+    val addrDifference = RegInit(U(7, (addrBitCap + 1) bits)) 
     val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
     
     val fsm = new StateMachine{
@@ -798,13 +799,14 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       .whenIsActive {
         dinReg := din
         counter := counter + 1
-        when(accessAddrReg > lastAddrReg)
+        
+        when(accessAddrReg(addrBitCap downto 0) > lastAddrReg(addrBitCap downto 0))
         {
-          addrDifference := accessAddrReg - lastAddrReg
+          addrDifference := accessAddrReg(addrBitCap downto 0) - lastAddrReg(addrBitCap downto 0)
         }
         .otherwise
         {
-          addrDifference := lastAddrReg - accessAddrReg
+          addrDifference := lastAddrReg(addrBitCap downto 0) - accessAddrReg(addrBitCap downto 0)
         }
         when(we.rise() || re.rise())
         {
