@@ -688,7 +688,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     isRTMBased generate new Area{
     /*//RTM instantiation parameters
     */
-    val trackLength = bytePerLine / 4 
+    val trackLength = bytePerLine / 4 //32 (word width, 4 Bytes) RTM tracks form a cache line.
     val maximumDelay = if(isRingTrack) (trackLength / howManyAccessPorts / 2).min(wayMemWordCount) else (trackLength / howManyAccessPorts).min(wayMemWordCount)
     val addrBitCap = log2Up(maximumDelay) - 1
     val bundleAddrRange = (log2Up(wayMemWordCount) - 1) downto (log2Up(wayMemWordCount) - log2Up(lineCount))
@@ -699,9 +699,8 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     //if track is shorter then mem word range in way (say, tiny cache of 8 words), max delay would be 8 instead of track length
     //this is also dependent on number of access ports. If many access ports, max delay would be tracklength/numaccessports/2
     //addrbitcap regulates the length needed for maximum value (max delay) of counters, how big they will be.
+    //This issue was already mitigated by treating cache lines as RTM bundles.
     
-    
-
     //Model Internal vars
     val addrDifference = RegInit(U((maximumDelay / 2 - 1), (addrBitCap + 1) bits))
     //initial port position at middle between access ports 

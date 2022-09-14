@@ -42,7 +42,7 @@ object GenMiscvAxi{
                     ),
                     new DBusCachedPlugin(
                             config = new DataCacheConfig(
-                            cacheSize        = 4096,
+                            cacheSize        = 131072,
                             bytePerLine      = 64,
                             wayCount         = 1,
                             addressWidth     = 32,
@@ -51,7 +51,7 @@ object GenMiscvAxi{
                             catchAccessError = false,
                             catchIllegal     = false,
                             catchUnaligned   = false,
-                            isRTMBased       = false,
+                            isRTMBased       = true,
                             isSTTBased       = false
                         ),
                             rtmConfig = new RTMConfig(

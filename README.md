@@ -94,3 +94,39 @@ This Repo also has a simple STT-RAM model integrated based on the numbers publis
   2. Integrated a RTM model with parameterized generation parameters, ringtrack, number of access ports, etc.
    
   3. Integrated a STT-RAM model with parameterized reading and writing latencies.
+
+## Literature
+
+- RTM Related
+
+  1. "R. Bläsing et al., "Magnetic Racetrack Memory: From Physics to the Cusp of Applications Within a Decade," in Proceedings of the IEEE, vol. 108, no. 8, pp. 1303-1321, Aug. 2020, doi: 10.1109/JPROC.2020.2975719." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9045991&tag=1)
+  
+  2. "Guangyu Sun, Jishen Zhao, Matt Poremba, Cong Xu, Yuan Xie, Memory that never forgets: emerging nonvolatile memory and the implication for architecture design, National Science Review, Volume 5, Issue 4, July 2018, Pages 577–592." [link](https://doi.org/10.1093/nsr/nwx082)
+  
+  3. "F. Hameed and J. Castrillon, "BlendCache: An Energy and Area Efficient Racetrack Last-Level-Cache Architecture," in IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, doi: 10.1109/TCAD.2022.3161198." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9739802)
+  
+  4. "Hugo Tárrega, Alejandro Valero, Vicente Lorente, Salvador Petit, and Julio Sahuquillo. 2022. Fast-track cache: a huge racetrack memory L1 data cache. In Proceedings of the 36th ACM International Conference on Supercomputing (ICS '22). Association for Computing Machinery, New York, NY, USA, Article 23, 1–12." [link](https://doi.org/10.1145/3524059.3532383)
+  
+  5. "G. Wang et al., "Ultra-Dense Ring-Shaped Racetrack Memory Cache Design," in IEEE Transactions on Circuits and Systems I: Regular Papers, vol. 66, no. 1, pp. 215-225, Jan. 2019, doi: 10.1109/TCSI.2018.2866932." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8458153)
+
+- STT-RAM Related
+  
+  1. "F. Sampaio, M. Shafique, B. Zatt, S. Bampi and J. Henkel, "Approximation-aware Multi-Level Cells STT-RAM cache architecture," 2015 International Conference on Compilers, Architecture and Synthesis for Embedded Systems (CASES), 2015, pp. 79-88, doi: 10.1109/CASES.2015.7324548." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7324548)
+  
+  2. "Z. Sun et al., "Multi retention level STT-RAM cache designs with a dynamic refresh scheme," 2011 44th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO), 2011, pp. 329-338." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7851483)
+
+- Other Memory Technologies (not implemented)
+
+  - PCMs
+  
+  1. "Gallo, Manuel & Sebastian, Abu. (2020). An overview of phase-change memory device physics. Journal of Physics D: Applied Physics. 53. 10.1088/1361-6463/ab7794." [link](https://iopscience.iop.org/article/10.1088/1361-6463/ab7794)
+  
+  2. "P. J. Nair, C. Chou, B. Rajendran and M. K. Qureshi, "Reducing read latency of phase change memory via early read and Turbo Read," 2015 IEEE 21st International Symposium on High Performance Computer Architecture (HPCA), 2015, pp. 309-319, doi: 10.1109/HPCA.2015.7056042." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7056042)
+  
+  3. "Shihao Song, Anup Das, Onur Mutlu, and Nagarajan Kandasamy. 2020. Improving phase change memory performance with data content aware access. In Proceedings of the 2020 ACM SIGPLAN International Symposium on Memory Management (ISMM 2020). Association for Computing Machinery, New York, NY, USA, 30–47." [link]( https://doi.org/10.1145/3381898.3397210)
+  
+  - ReRAMs
+  
+  1. "J. B. Kotra, M. Arjomand, D. Guttman, M. T. Kandemir and C. R. Das, "Re-NUCA: A Practical NUCA Architecture for ReRAM Based Last-Level Caches," 2016 IEEE International Parallel and Distributed Processing Symposium (IPDPS), 2016, pp. 576-585, doi: 10.1109/IPDPS.2016.79." [link](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7516054)
+  
+  2. "W. Cadence et al., "Monolithically Integrated SRAM-ReRAM Cache-Main Memory System", Electrical & Computer Engineering Theses and Dissertations, UMD Theses and Dissertations." [link](http://hdl.handle.net/1903/27949)
