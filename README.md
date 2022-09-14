@@ -1,6 +1,6 @@
 # Vexriscv Fork with a Cache Based on a Latency Accurate RTM model
 
-This VexRiscv fork contains a data cache based on a latency accurate RTM model (racetrack memory model).
+This VexRiscv fork contains a data cache based on a latency accurate RTM model (racetrack memory model).  
 [Literature](#Literature)
 
 ## How to Use This
