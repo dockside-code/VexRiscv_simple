@@ -33,6 +33,7 @@ The structure of our implemented cache:
 
 The Data Cache is a bridging component between the rest of the processor and the data memory. The CPU, during a memory access, first reaches into the cache for the purpose of reducing access time (DRAMs take 10-20 cycles to complete a operation, whilst  SRAMs take 1-3, depending on the technology). During the access, the data cache of the vexriscv core observes the following policies:
 
+[//]: # (jesus this image is so ugly I can't take it anymore)
 ![cache policies](./img/cachepolicies.png)
 
 The behavior of the cache: during read process, if hit, after examining the tags (SRAM based), read directly from the cache. If there's no hit, the cache load an entire line of data (regulated by a single burst from the AXI protocol based memory) from the main memory and write into the data bank. The cache issues a redo current command and the data is re - read from the cache.
