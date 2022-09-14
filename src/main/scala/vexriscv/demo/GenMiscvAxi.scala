@@ -12,15 +12,13 @@ import spinal.lib.bus.amba4.axi.Axi4ReadOnly
 import spinal.lib.bus.avalon.AvalonMM
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.eda.altera.{InterruptReceiverTag, QSysify, ResetEmitterTag}
-import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
+import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig, RTMConfig, STTConfig, SRAMConfig}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 /**
 * Created by spinalvm on 15.06.17.
 */
-// object GenFullNoMmuNoCache extends App{
-// object GenSignate extends App{
-object GenSignate{
+object GenMiscvAxi{
     def main(args: Array[String]) {
         val report = SpinalVerilog{
             val cpuConfig = VexRiscvConfig(
@@ -45,14 +43,29 @@ object GenSignate{
                     new DBusCachedPlugin(
                             config = new DataCacheConfig(
                             cacheSize        = 4096,
-                            bytePerLine      = 32,
+                            bytePerLine      = 64,
                             wayCount         = 1,
                             addressWidth     = 32,
                             cpuDataWidth     = 32,
                             memDataWidth     = 32,
                             catchAccessError = false,
                             catchIllegal     = false,
-                            catchUnaligned   = false
+                            catchUnaligned   = false,
+                            isRTMBased       = false,
+                            isSTTBased       = false
+                        ),
+                            rtmConfig = new RTMConfig(
+                            howManyShiftPerCycle = 1,//use lower - bounded (e.g. 0.33 instead of 0.34) literal value of 1/n
+                            //how many word per line - consider each line is a RTM bundle of 32 tracks here, so line size affect trackLength
+                            howManyAccessPorts = 1, //how many accessports per track
+                            isRingTrack = false
+                        ),
+                            sttConfig = new STTConfig(
+                            readLatency = 2,
+                            writeLatency = 21 //default is high retension STTRAM
+                        ),
+                            sramConfig = new SRAMConfig(
+                            accessLatency = 2 //sram access latency
                         )
                     ),
                     new PmpPlugin(
@@ -60,43 +73,36 @@ object GenSignate{
                         granularity = 32,
                         ioRange = _(31 downto 28) === 0xf
                     ),
-                    new DecoderSimplePlugin(
-                        catchIllegalInstruction = true
-                    ),
-                    new RegFilePlugin(
-                        regFileReadyKind = plugin.SYNC,
-                        zeroBoot = false
-                    ),
-                    new IntAluPlugin,
-                    new SrcPlugin(
-                        separatedAddSub = false,
-                        executeInsertion = true
-                    ),
-                    new FullBarrelShifterPlugin,
-                    new HazardSimplePlugin(
-                        bypassExecute = true,
-                        bypassMemory = true,
-                        bypassWriteBack = true,
-                        bypassWriteBackBuffer = true,
-                        pessimisticUseSrc = false,
-                        pessimisticWriteRegFile = false,
-                        pessimisticAddressMatch = false
-                    ),
-                    new MulPlugin,
-                    new DivPlugin,
-                    new CsrPlugin(CsrPluginConfig.small),
-                    //new DebugPlugin(ClockDomain.current.clone(reset =
-                    // Bool().setName("debugReset"))),
-                    new BranchPlugin(
-                        earlyBranch = false,
-                        catchAddressMisaligned = true
-                    ),
-                    new FpuPlugin(
-                        externalFpu = false,
-                        simHalt = false,
-                        p = FpuParameter(withDouble = false)
-                    ),
-                    new YamlPlugin("cpu0.yaml")
+        new CsrPlugin(CsrPluginConfig.smallest),
+        new DecoderSimplePlugin(
+          catchIllegalInstruction = false
+        ),
+        new RegFilePlugin(
+          regFileReadyKind = plugin.SYNC,
+          zeroBoot = false
+        ),
+        new IntAluPlugin,
+        new MulPlugin,
+        new DivPlugin,
+        new SrcPlugin(
+          separatedAddSub = false,
+          executeInsertion = false
+        ),
+        new LightShifterPlugin,
+        new HazardSimplePlugin(
+          bypassExecute           = false,
+          bypassMemory            = false,
+          bypassWriteBack         = false,
+          bypassWriteBackBuffer   = false,
+          pessimisticUseSrc       = false,
+          pessimisticWriteRegFile = false,
+          pessimisticAddressMatch = false
+        ),
+        new BranchPlugin(
+          earlyBranch = false,
+          catchAddressMisaligned = false
+        ),
+        new YamlPlugin("cpu0.yaml")
                 )
             )
             // SpinalVerilog(cpu())
@@ -104,7 +110,7 @@ object GenSignate{
             val cpu = new VexRiscv(cpuConfig)
             // val cpu = SpinalVerilog(cpu())
             //CPU modifications to be an Avalon one
-            cpu.setDefinitionName("VexRiscvSignate")
+            cpu.setDefinitionName("VexMiscvAxi")
             cpu.rework {
                 var iBus : Axi4ReadOnly = null
                 for (plugin <- cpuConfig.plugins) plugin match {

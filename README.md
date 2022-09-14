@@ -8,13 +8,13 @@ Change into repo root dir
 `cd [repo_root]`  
 Boot sbt  
 `sbt`  
-Compile verilog with config [GenSmallestAxi](./src/main/scala/vexriscv/demo/GenSmallestAxi.scala)  
-`runMain vexriscv.demo.GenSmallestAxi`  
+Compile verilog with config [GenMiscvAxi](./src/main/scala/vexriscv/demo/GenMiscvAxi.scala)  
+`runMain vexriscv.demo.GenMiscvAxi`  
 You can find the compiled verilog file in repo root dir.
 
 A few things to keep in mind:
 
-- Cached dbus plugins only work with mmus or pmps
+- Cached dbus plugins only work with mmus or pmps, if mmu is instantiated, a single D$ way cannt exceed 4KB.
 - DBus and IBUS are instantiated to have a AXI port
 - AMOs, LRSCs, invalidates and exclusives are not supported in the [cache configs](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L27)
 
@@ -38,14 +38,14 @@ The behavior of the cache: during read process, if hit, after examining the tags
 
 During write process, if there's a hit, write both into cache and the main memory. Otherwise write ONLY to the main memory.
 
-Due to the main memory being faster(!) in this case, a buffer was introduced between the memory and the cache. (See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L872>)) This is only intended for the refill line operation, during which a burst is read into the cache. When the data bank is ready to take in more values, it informs the loader(See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1331>)), which in turn informs the buffer to give out the next value. The loader calculates the next cache address and writes into the cache. After the data bank is ready again, the loader and the buffer increments again.
+Due to the main memory being faster(!) in this case, a buffer was introduced between the memory and the cache. (See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L955>)) This is only intended for the refill line operation, during which a burst is read into the cache. When the data bank is ready to take in more values, it informs the loader(See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1414>)), which in turn informs the buffer to give out the next value. The loader calculates the next cache address and writes into the cache. After the data bank is ready again, the loader and the buffer increments again.
 
-The RTM model was implemented with a state machine. It enters counter incrementation mode upon read/write enable signals and exits upon the counter reaching the address difference between this access address and the last, (See [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L755))during this it will emit a ready signal, informing others that it's ready to take in more values.
+The RTM model was implemented with a state machine. It enters counter incrementation mode upon read/write enable signals and exits upon the counter reaching the address difference between this access address and the last, (See [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L714))during this it will emit a ready signal, informing others that it's ready to take in more values.
 
-The track length (max latency) is customizable, [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L756) as well as the cache line configs. (Multi - way configs are theoretically supported but not tested)
+The track length (max latency) is customizable, [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L756) as well as the cache line configs. 
 
 The cache is programmed to halt the rest of the pipeline (execution and writeback) when:  
-[See here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1389)
+[See here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1467)
 
 - There's a refill process
 - There's a W/R access to the cache and the databanks are not yet ready
@@ -58,7 +58,9 @@ Other memories could easily be modelled with existing infrastructure [here](http
 - Emits a ready signal when read/write is complete (valid_dout).
 - Accepts address (access_addr) for reading/writing, accepts data (din) for writing and gives out (dout) when read is complete.
 
-## TODOs
+This Repo also has a simple STTRAM model integrated based on the numbers published [here](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7851483), "Multi retention level STT-RAM cache designs with a dynamic refresh scheme, Z. Sun et al.". 
+
+## Changelog
 
 - Correct DataBank/Main Memory Access Timing:  
   

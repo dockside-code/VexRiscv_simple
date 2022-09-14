@@ -9,7 +9,10 @@ import spinal.lib.bus.amba4.axi.Axi4
 import scala.collection.mutable.ArrayBuffer
 
 
-class DAxiCachedPlugin(config : DataCacheConfig, memoryTranslatorPortConfig : Any = null) extends DBusCachedPlugin(config, memoryTranslatorPortConfig) {
+class DAxiCachedPlugin
+(config : DataCacheConfig, rtmConfig : RTMConfig, sttConfig : STTConfig, sramConfig : SRAMConfig,
+ memoryTranslatorPortConfig : Any = null) 
+extends DBusCachedPlugin(config, rtmConfig, sttConfig, sramConfig, memoryTranslatorPortConfig) {
   var dAxi  : Axi4 = null
 
   override def build(pipeline: VexRiscv): Unit = {
@@ -28,12 +31,18 @@ trait DBusEncodingService {
 }
 
 class DBusCachedPlugin(val config : DataCacheConfig,
+                       val rtmConfig : RTMConfig,
+                       val sttConfig : STTConfig,
+                       val sramConfig : SRAMConfig,
+
                        memoryTranslatorPortConfig : Any = null,
+                       
                        dBusCmdMasterPipe : Boolean = false,
                        dBusCmdSlavePipe : Boolean = false,
                        dBusRspSlavePipe : Boolean = false,
                        relaxedMemoryTranslationRegister : Boolean = false,
-                       csrInfo : Boolean = false)  extends Plugin[VexRiscv] with DBusAccessService with DBusEncodingService with VexRiscvRegressionArg {
+                       csrInfo : Boolean = false
+                      )  extends Plugin[VexRiscv] with DBusAccessService with DBusEncodingService with VexRiscvRegressionArg {
   import config._
   assert(!(config.withExternalAmo && !dBusRspSlavePipe))
   assert(isPow2(cacheSize))
@@ -266,7 +275,10 @@ class DBusCachedPlugin(val config : DataCacheConfig,
         mergeExecuteMemory = writeBack == null,
         rfDataWidth = 32
       ),
-      mmuParameter = mmuBus.p
+      mmuParameter = mmuBus.p,
+      this.rtmConfig.copy(),
+      this.sttConfig.copy(),
+      this.sramConfig.copy()
     )
 
     //Interconnect the plugin dBus with the cache dBus with some optional pipelining

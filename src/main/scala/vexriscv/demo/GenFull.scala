@@ -1,11 +1,14 @@
 package vexriscv.demo
 
 import vexriscv.plugin._
-import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
+import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig, RTMConfig, STTConfig, SRAMConfig}
 import vexriscv.{plugin, VexRiscv, VexRiscvConfig}
 import spinal.core._
 
 /**
+ * This is a dummy config! And not intended for instantiation of MISCV.
+ * Though it may work anyways as long as D$ way size does not exceed 4096KB
+ * Since this config instantiates a MMU
  * Created by spinalvm on 15.06.17.
  */
 object GenFull extends App{
@@ -44,6 +47,12 @@ object GenFull extends App{
         ),
         memoryTranslatorPortConfig = MmuPortConfig(
           portTlbSize = 6
+        ),
+        rtmConfig = new RTMConfig(
+        ),
+        sttConfig = new STTConfig(
+        ),
+        sramConfig = new SRAMConfig(
         )
       ),
       new MmuPlugin(

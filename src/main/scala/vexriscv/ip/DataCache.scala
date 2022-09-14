@@ -32,13 +32,17 @@ case class DataCacheConfig(cacheSize : Int,
                            directTlbHit : Boolean = false,
                            mergeExecuteMemory : Boolean = false,
                            asyncTagMemory : Boolean = false,
-                           withWriteAggregation : Boolean = false){
+                           withWriteAggregation : Boolean = false,
+                           isRTMBased: Boolean = true,
+                           isSTTBased: Boolean = false
+                           ){
 
   if(rfDataWidth == -1)  rfDataWidth = cpuDataWidth 
   assert(!(mergeExecuteMemory && (earlyDataMux || earlyWaysHits)))
   assert(!(earlyDataMux && !earlyWaysHits))
   assert(isPow2(pendingMax))
   assert(rfDataWidth <= memDataWidth)
+  assert(!(isRTMBased && isSTTBased))
 
   def lineCount = cacheSize/bytePerLine/wayCount
   def sizeMax = log2Up(bytePerLine)
@@ -110,6 +114,32 @@ case class DataCacheConfig(cacheSize : Int,
       invalidateAlignment = BmbParameter.BurstAlignement.LENGTH
     )
   )
+}
+
+case class RTMConfig(
+    howManyShiftPerCycle : Double = 1,//use lower - bounded (e.g. 0.33 instead of 0.34) literal value of 1/n
+    //how many word per line - consider each line is a RTM bundle of 32 tracks here, so line size affect trackLength
+    howManyAccessPorts   : Int = 1, //how many accessports per track
+    isRingTrack          : Boolean = false){
+    /*val trackLength = p.bytePerLine / 4 
+    val maximumDelay = if(isRingTrack) (trackLength / howManyAccessPorts / 2).min(p.wayMemWordCount) else (trackLength / howManyAccessPorts).min(p.wayMemWordCount)
+    val addrBitCap = log2Up(maximumDelay) - 1
+    val bundleAddrRange = (log2Up(p.wayMemWordCount) - 1) downto (log2Up(p.wayMemWordCount) - log2Up(p.lineCount))*/
+}
+
+case class STTConfig(
+    readLatency : Int = 2,
+    writeLatency : Int = 21 //default is high retension STTRAM
+)
+{
+
+}
+
+case class SRAMConfig(
+    accessLatency : Int = 2
+)
+{
+
 }
 
 object DataCacheCpuExecute{
@@ -564,8 +594,13 @@ object DataCacheExternalAmoStates extends SpinalEnum{
 }
 
 //If external amo, mem rsp should stay
-class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParameter) extends Component{
+class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParameter,
+ val r : RTMConfig, val s : STTConfig, val b : SRAMConfig)
+  extends Component{
   import p._
+  import r._
+  import s._
+  import b._
 
   val io = new Bundle{
     val cpu = slave(DataCacheCpuBus(p, mmuParameter))
@@ -621,6 +656,11 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val mask = Bits(memDataWidth/8 bits)
   })
 
+  val DRAMPenaltyManager = new Area{      //legacy code, only connects wire now.
+    val memCmdValid = Bool
+    io.mem.cmd.valid := memCmdValid
+  }
+
 
   val ways = for(i <- 0 until wayCount) yield new Area{
     val tags = Mem(new LineInfo(), wayLineCount)
@@ -631,144 +671,46 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       case false => tags.readSync(tagsReadCmd.payload, tagsReadCmd.valid && !io.cpu.memory.isStuck)
       case true => tags.readAsync(RegNextWhen(tagsReadCmd.payload, io.cpu.execute.isValid && !io.cpu.memory.isStuck))
     }
-    //val dataReadRspMem = data.readSync(dataReadCmd.payload, dataReadCmd.valid && !io.cpu.memory.isStuck)
-    //val dataReadRspSel = if(mergeExecuteMemory) io.cpu.writeBack.address else io.cpu.memory.address
-    //val dataReadRsp = dataReadRspMem.subdivideIn(cpuDataWidth bits).read(dataReadRspSel(memWordToCpuWordRange))
-
-    /*val dataBankWrapper = new Area{
-
-      val timer = Counter(4)
-      val we = RegInit(False) setWhen(dataWriteCmd.valid && dataWriteCmd.way(i)) clearWhen(timer.willOverflow) //stageB should take care of this!
-      val re = RegInit(False) setWhen((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we) clearWhen(timer.willOverflow)
-      //val we = Bool
-      //val re = Bool
-      val timerTicks = RegInit(False) setWhen(re || we) clearWhen((timer.willOverflow && !re) && !we)   //need to extend re/we
-      val AccessAddr = UInt(log2Up(wayMemWordCount) bits)
-      
-      when(timerTicks)
-      {
-        timer.increment()
-      }
-      when(we)
-      {
-          AccessAddr := dataWriteCmd.address
-      }
-      .elsewhen(re)
-      {
-          AccessAddr := dataReadCmd.payload
-      }
-      .otherwise
-      {
-          AccessAddr := U(0)
-      }
-
-      val addrReg = RegNextWhen(AccessAddr, we || re)
-      val din = dataWriteCmd.data
-      val dinReg = RegNextWhen(din, we)
-
-      val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
-
-      val dout = data.readSync(addrReg, RegNext(re))
-      val doutReg = RegNextWhen(dout, timer.value === (3))
-      when(we && timer.value === 3){
-      data.write(
-        address = addrReg,
-        data = dinReg
-      )
-    }
-      
-      val valid_dout = RegNext(timer.willOverflow)
-    }*/
-
-    /*val dataBankWrapper = new Area{
-
-      val timer = Counter(16)
-      val we = (dataWriteCmd.valid && dataWriteCmd.way(i) )//stageB should take care of this!
-      val re = ((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we)
-      val lastAddr = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
-      val accessAddr = Mux(we, dataWriteCmd.address, dataReadCmd.payload)
-      val accessAddrReg = RegNextWhen(accessAddr, we || re)
-      val ticker = Counter(2)
-      /*when(we)
-      {
-          accessAddr := dataWriteCmd.address
-      }
-      .elsewhen(re)
-      {
-          accessAddr := dataReadCmd.payload
-      }
-      .otherwise
-      {
-          accessAddr := U(0)
-      }*/
-
-      //val we = Bool
-      //val re = Bool
-      val addrDifference = Mux(lastAddr > accessAddrReg, lastAddr - accessAddrReg, accessAddrReg - lastAddr)
-
-      val timerTicks = timer.value < addrDifference
-
-      val timerHit = (timer.value === addrDifference) && (we || re)//&& (timer.value =/= 0)
-
-      when(timerHit.rise())
-      {
-        ticker.increment()
-      }
-      when(ticker.value === 1)
-      {
-        ticker.clear()
-      }
-      when(timerTicks)
-      {
-        timer.increment()
-      }
-      
-      /*val addrReg = RegNextWhen(AccessAddr, we || re)*/
-      val din = dataWriteCmd.data
-      /*val dinReg = RegNextWhen(din, we)*/
-
-      val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
-
-      val dout = data.readSync(accessAddrReg, timerHit)
-
-      val doutReg = RegNextWhen(dout, timerHit)
-
-      when(we && timerHit){
-      data.write(
-        address = accessAddrReg,
-        data = din
-      )
-    }
-    when(timerHit || (we.rise() || re.rise()))
-    {
-      //lastAddr := accessAddr
-      timer.clear()
-    }
-    when(we || re || timerHit.){
-      lastAddr := accessAddrReg
-    }
-      
-      val valid_dout = timerHit
-    }*/
 
     import spinal.lib.fsm._
+    //data array area
     val dataBankWrapper = new Area{
-    val trackLength = 16
-    val addrBitCap = (log2Up(trackLength) - 1).min(log2Up(wayMemWordCount) - 1)
-    val counter = Reg(UInt((addrBitCap + 1) bits)) init (0)
+    //Memory Bank IOs
     val valid_dout = False
     val dout = Reg(Bits(memDataWidth bit))
     val dinReg = Reg(Bits(memDataWidth bit))
     val din = dataWriteCmd.data
-
-    val we = (dataWriteCmd.valid && dataWriteCmd.way(i) )//stageB should take care of this!
+    val we = (dataWriteCmd.valid && dataWriteCmd.way(i) )
     val re = ((dataReadCmd.valid && !io.cpu.memory.isStuck) && !we)
-    val lastAddrReg = RegInit(U(7, log2Up(wayMemWordCount) bits)) 
     val accessAddr = Mux(we, dataWriteCmd.address, dataReadCmd.payload)
-    val accessAddrReg = RegInit(U(0, log2Up(wayMemWordCount) bits)) 
-    val addrDifference = RegInit(U(7, (addrBitCap + 1) bits)) 
-    val data = Mem(Bits(memDataWidth bit), wayMemWordCount)
+    val accessAddrReg = RegInit(U(0, log2Up(wayMemWordCount) bits))
+
+    isRTMBased generate new Area{
+    /*//RTM instantiation parameters
+    */
+    val trackLength = bytePerLine / 4 
+    val maximumDelay = if(isRingTrack) (trackLength / howManyAccessPorts / 2).min(wayMemWordCount) else (trackLength / howManyAccessPorts).min(wayMemWordCount)
+    val addrBitCap = log2Up(maximumDelay) - 1
+    val bundleAddrRange = (log2Up(wayMemWordCount) - 1) downto (log2Up(wayMemWordCount) - log2Up(lineCount))
+    //println(s"bundle Addr range is $bundleAddrRange")
+    //println(s"addrcap is, $addrBitCap")
+    //println(s"maxdelay is, $maximumDelay")
+    //this regulates how the addr difference works
+    //if track is shorter then mem word range in way (say, tiny cache of 8 words), max delay would be 8 instead of track length
+    //this is also dependent on number of access ports. If many access ports, max delay would be tracklength/numaccessports/2
+    //addrbitcap regulates the length needed for maximum value (max delay) of counters, how big they will be.
     
+    
+
+    //Model Internal vars
+    val addrDifference = RegInit(U((maximumDelay / 2 - 1), (addrBitCap + 1) bits))
+    //initial port position at middle between access ports 
+    val data = Mem(Bits(memDataWidth bit), wayMemWordCount) //SRAM databank
+    val counter = Reg(UInt((addrBitCap + 6) bits)) init (0) //6 bits is arbitrary, need to align with addrdiffcase
+    //tracks of each bundle move together. So each bundle have its own lastAddrReg
+    val lastAddrReg = Vec(RegInit(U((maximumDelay / 2 - 1), log2Up(wayMemWordCount) bits)), lineCount)
+
+    //FSM controls 
     val fsm = new StateMachine{
     val stateA = new State with EntryPoint
     val stateB = new State
@@ -778,7 +720,11 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val re_reg = Reg(Bool)
     
 
-    stateA
+    stateA //idle state
+      //.onEntry
+      //{
+      //  counter := 0
+      //}
       .whenIsActive 
       {
       when(we || re)
@@ -787,7 +733,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       }
       }
 
-    stateB
+    stateB //when there's a rw access to the cache
       .onEntry
       {
         counter := 0
@@ -797,22 +743,32 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         re_reg := re
       }
       .whenIsActive {
-        dinReg := din
-        counter := counter + 1
         
-        when(accessAddrReg(addrBitCap downto 0) > lastAddrReg(addrBitCap downto 0))
+        dinReg := din
+
+        when(accessAddrReg > lastAddrReg(accessAddrReg(bundleAddrRange)))
         {
-          addrDifference := accessAddrReg(addrBitCap downto 0) - lastAddrReg(addrBitCap downto 0)
+          addrDifference := (accessAddrReg - lastAddrReg(accessAddrReg(bundleAddrRange)))(addrBitCap downto 0)
         }
         .otherwise
         {
-          addrDifference := lastAddrReg(addrBitCap downto 0) - accessAddrReg(addrBitCap downto 0)
+          addrDifference := (lastAddrReg(accessAddrReg(bundleAddrRange)) - accessAddrReg)(addrBitCap downto 0)
+        }
+        val addrDifferenceCase = UInt((addrBitCap + 6) bits) //exactly how many counts we need: related to howManyShiftsPerCycle
+        if(howManyShiftPerCycle <= 1)
+        { 
+        addrDifferenceCase := (addrDifference * U((1/howManyShiftPerCycle).toInt, 5 bits))
+        } 
+        else
+        { 
+        addrDifferenceCase := ((addrDifference / U(howManyShiftPerCycle.toInt)))// + Mux((addrDifference % U(howManyShiftPerCycle)) === U(0), U(0), U(1))
+        // + Mux((addrDifference % U(howManyShiftPerCycle)) === U(0), U(0), U(1))
         }
         when(we.rise() || re.rise())
         {
           goto(stateA)
-        }
-        .elsewhen(RegNext(counter) === addrDifference){
+        }        
+        .elsewhen(RegNext(counter) === addrDifferenceCase){
           
           when(we_reg)
           {
@@ -825,19 +781,146 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
           {
             dout := data.readSync(accessAddrReg)
           }
-          lastAddrReg := accessAddrReg
+          lastAddrReg(accessAddrReg(bundleAddrRange)) := accessAddrReg
           goto(stateA)
           valid_dout := True
         }
+
+        counter := counter + 1
         
       }
-      //.onExit(valid_dout := True)
-      
-
-    //stateC
-    //  .whenIsActive (goto(stateA))
   }
+  }//end RTM based
+
+  isSTTBased generate new Area{
+    //Model Internal vars
+
+    val data = Mem(Bits(memDataWidth bit), wayMemWordCount) //SRAM databank
+    val counter = Reg(UInt((6) bits)) init (0) //6 bits is arbitrary 
+    val we_reg = Reg(Bool)
+    val re_reg = Reg(Bool)
+
+    //FSM controls 
+    val fsm = new StateMachine{
+    val stateA = new State with EntryPoint
+    val stateB = new State
+    val stateC = new State
+
+
     
+
+    stateA //idle state
+      //.onEntry
+      //{
+      //  counter := 0
+      //}
+      .whenIsActive 
+      {
+      when(we || re)
+      {
+        (goto(stateB))
+      }
+      }
+
+    stateB //when there's a rw access to the cache
+      .onEntry
+      {
+        counter := 0
+        accessAddrReg := accessAddr
+        //dinReg := din
+        we_reg := we
+        re_reg := re
+      }
+      .whenIsActive {
+        
+        dinReg := din
+
+        when(we.rise() || re.rise())
+        {
+          goto(stateA)
+        }        
+        .elsewhen((re_reg && RegNext(counter) === U(readLatency)) || (we_reg && RegNext(counter) === U(writeLatency))){
+          
+          when(we_reg)
+          {
+            data.write(
+            address = accessAddrReg,
+            data = dinReg
+          )
+          }
+          .elsewhen(re_reg)
+          {
+            dout := data.readSync(accessAddrReg)
+          }
+          goto(stateA)
+          valid_dout := True
+        }
+
+        counter := counter + 1
+      }
+  }
+  }//end STT based
+
+  (!isRTMBased && !isSTTBased) generate new Area{//is SRAM based
+    //Model Internal vars
+
+    val data = Mem(Bits(memDataWidth bit), wayMemWordCount) //SRAM databank
+    val counter = Reg(UInt((2) bits)) init (0) //6 bits is arbitrary 
+    val we_reg = Reg(Bool)
+    val re_reg = Reg(Bool)
+
+    //FSM controls 
+    val fsm = new StateMachine{
+    val stateA = new State with EntryPoint
+    val stateB = new State
+
+    stateA //idle state
+      //.onEntry
+      //{
+      //  counter := 0
+      //}
+      .whenIsActive 
+      {
+      when(we || re)
+      {
+        (goto(stateB))
+      }
+      }
+
+    stateB //when there's a rw access to the cache
+      .onEntry
+      {
+        counter := 0
+        accessAddrReg := accessAddr
+        //dinReg := din
+        we_reg := we
+        re_reg := re
+      }
+      .whenIsActive {
+        
+        dinReg := din
+
+        when(RegNext(counter) === U(accessLatency)){
+          
+          when(we_reg)
+          {
+            data.write(
+            address = accessAddrReg,
+            data = dinReg
+          )
+          }
+          .elsewhen(re_reg)
+          {
+            dout := data.readSync(accessAddrReg)
+          }
+          goto(stateA)
+          valid_dout := True
+        }
+
+        counter := counter + 1
+      }
+  }
+  }//end SRAM based     
   }//end databank
 
 
@@ -1184,7 +1267,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     io.cpu.writeBack.isWrite := request.wr
 
 
-    io.mem.cmd.valid := False
+    DRAMPenaltyManager.memCmdValid := False
     io.mem.cmd.address := mmuRsp.physicalAddress
     io.mem.cmd.last := True
     io.mem.cmd.wr := request.wr
@@ -1202,7 +1285,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
       when(isExternalAmo){
         if(withExternalAmo) switch(amo.external.state){
           is(LR_CMD){
-            io.mem.cmd.valid := True
+            DRAMPenaltyManager.memCmdValid := True
             io.mem.cmd.wr := False
             when(io.mem.cmd.ready) {
               amo.external.state := LR_RSP
@@ -1215,7 +1298,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
             }
           }
           is(SC_CMD){
-            io.mem.cmd.valid := True
+            DRAMPenaltyManager.memCmdValid := True
             when(io.mem.cmd.ready) {
               amo.external.state := SC_RSP
             }
@@ -1237,10 +1320,10 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
         io.cpu.writeBack.haltIt.clearWhen(waitResponse ? (io.mem.rsp.valid && rspSync) | io.mem.cmd.ready)
 
-        io.mem.cmd.valid := !memCmdSent
+        DRAMPenaltyManager.memCmdValid := !memCmdSent
 
         if(withInternalLrSc) when(request.isLrsc && !lrSc.reserved){
-          io.mem.cmd.valid := False
+          DRAMPenaltyManager.memCmdValid := False
           io.cpu.writeBack.haltIt := False
         }
       } otherwise {
@@ -1248,12 +1331,12 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
           cpuWriteToCache := True
 
           //Write through
-          io.mem.cmd.valid setWhen(request.wr)
+          DRAMPenaltyManager.memCmdValid setWhen(request.wr)
           io.cpu.writeBack.haltIt clearWhen(!request.wr || io.mem.cmd.ready)
 
           if(withInternalAmo) when(isAmo){
             when(!amo.internal.resultRegValid) {
-              io.mem.cmd.valid := False
+              DRAMPenaltyManager.memCmdValid := False
               dataWriteCmd.valid := False
               io.cpu.writeBack.haltIt := True
             }
@@ -1262,17 +1345,17 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
           //On write to read dataColisions
           when((!request.wr || isAmoCached) && (dataColisions & waysHits) =/= 0){
             io.cpu.redo := True
-            if(withAmo) io.mem.cmd.valid := False
+            if(withAmo) DRAMPenaltyManager.memCmdValid := False
           }
 
           if(withInternalLrSc) when(request.isLrsc && !lrSc.reserved){
-            io.mem.cmd.valid := False
+            DRAMPenaltyManager.memCmdValid := False
             dataWriteCmd.valid := False
             io.cpu.writeBack.haltIt := False
           }
         } otherwise { //Do refill
           //Emit cmd
-          io.mem.cmd.valid setWhen(!memCmdSent)
+          DRAMPenaltyManager.memCmdValid setWhen(!memCmdSent)
           io.mem.cmd.wr := False
           io.mem.cmd.address(0, lineRange.low bits) := 0
           io.mem.cmd.size := log2Up(p.bytePerLine)
@@ -1307,7 +1390,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
 
     //remove side effects on exceptions
     when(consistancyHazard || mmuRsp.refilling || io.cpu.writeBack.accessError || io.cpu.writeBack.mmuException || io.cpu.writeBack.unalignedAccess){
-      io.mem.cmd.valid := False
+      DRAMPenaltyManager.memCmdValid := False
       tagsWriteCmd.valid := False
       dataWriteCmd.valid := False
       loaderValid := False
