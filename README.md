@@ -16,7 +16,7 @@ A few things to keep in mind:
 
 - Cached dbus plugins only work with mmus or pmps, if mmu is instantiated, a single D$ way cannt exceed 4KB.
 - DBus and IBUS are instantiated to have a AXI port
-- AMOs, LRSCs, invalidates and exclusives are not supported in the [cache configs](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L27)
+- AMOs, LRSCs, invalidates and exclusives are not supported in the [cache configs](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L27)
 
 ## The RTM Cache
 
@@ -38,27 +38,27 @@ The behavior of the cache: during read process, if hit, after examining the tags
 
 During write process, if there's a hit, write both into cache and the main memory. Otherwise write ONLY to the main memory.
 
-Due to the main memory being faster(!) in this case, a buffer was introduced between the memory and the cache. (See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L955>)) This is only intended for the refill line operation, during which a burst is read into the cache. When the data bank is ready to take in more values, it informs the loader(See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1414>)), which in turn informs the buffer to give out the next value. The loader calculates the next cache address and writes into the cache. After the data bank is ready again, the loader and the buffer increments again.
+Due to the main memory being faster(!) in this case, a buffer was introduced between the memory and the cache. (See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L955>)) This is only intended for the refill line operation, during which a burst is read into the cache. When the data bank is ready to take in more values, it informs the loader(See [here](<https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L1414>)), which in turn informs the buffer to give out the next value. The loader calculates the next cache address and writes into the cache. After the data bank is ready again, the loader and the buffer increments again.
 
-The RTM model was implemented with a state machine. It enters counter incrementation mode upon read/write enable signals and exits upon the counter reaching the address difference between this access address and the last, (See [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L714))during this it will emit a ready signal, informing others that it's ready to take in more values.
+The RTM model was implemented with a state machine. It enters counter incrementation mode upon read/write enable signals and exits upon the counter reaching the address difference between this access address and the last, (See [here](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L714))during this it will emit a ready signal, informing others that it's ready to take in more values.
 
-The track length (max latency) is customizable, [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L756) as well as the cache line configs. 
+The track length, among other parameters for instantiation is customizable, [here](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L119) as well as the cache line configs. 
 
 The cache is programmed to halt the rest of the pipeline (execution and writeback) when:  
-[See here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L1467)
+[See here](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L1467)
 
 - There's a refill process
 - There's a W/R access to the cache and the databanks are not yet ready
 
 ## Supporting Other Memory Models
 
-Other memories could easily be modelled with existing infrastructure [here](https://github.com/dockside-code/VexRiscv_simple/blob/bd8fbf6994c7e067e08034ad3ab56d2ccd32918a/src/main/scala/vexriscv/ip/DataCache.scala#L755), as long as they follows:
+Other memories could easily be modelled with existing infrastructure [here](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L679), as long as they follows:
 
 - Able to do read/write operations continously. Meaning that the memory model should be able to accept a series of accesses during read/write (latency is a non - issue here, the RE/WE enable signals will be high for the entirety of the serial access).
 - Emits a ready signal when read/write is complete (valid_dout).
 - Accepts address (access_addr) for reading/writing, accepts data (din) for writing and gives out (dout) when read is complete.
 
-This Repo also has a simple STTRAM model integrated based on the numbers published [here](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7851483), "Multi retention level STT-RAM cache designs with a dynamic refresh scheme, Z. Sun et al.". 
+This Repo also has a simple STT-RAM model integrated based on the numbers published [here](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7851483), "Multi retention level STT-RAM cache designs with a dynamic refresh scheme, Z. Sun et al.". 
 
 ## Changelog
 
@@ -86,3 +86,11 @@ This Repo also has a simple STTRAM model integrated based on the numbers publish
 - Construct a more conprehensive and illustraing test program  (Done)
 
   1. Problem was probably casued by vivado simulation errors.
+
+- Created a unified generator for memory models
+  
+  1. Integrated a SRAM model with parameterized access latencies.
+
+  2. Integrated a RTM model with parameterized generation parameters, ringtrack, number of access ports, etc.
+   
+  3. Integrated a STT-RAM model with parameterized reading and writing latencies.
