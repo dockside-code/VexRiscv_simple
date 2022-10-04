@@ -760,7 +760,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         } 
         else
         { 
-        addrDifferenceCase := ((addrDifference / U(howManyShiftPerCycle.toInt)))// + Mux((addrDifference % U(howManyShiftPerCycle)) === U(0), U(0), U(1))
+        addrDifferenceCase := ((addrDifference / U(howManyShiftPerCycle.toInt))).resized// + Mux((addrDifference % U(howManyShiftPerCycle)) === U(0), U(0), U(1))
         // + Mux((addrDifference % U(howManyShiftPerCycle)) === U(0), U(0), U(1))
         }
         when(we.rise() || re.rise())
@@ -809,10 +809,10 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     
 
     stateA //idle state
-      //.onEntry
-      //{
-      //  counter := 0
-      //}
+      .onEntry
+      {
+        counter := 0
+      }
       .whenIsActive 
       {
       when(we || re)
@@ -838,7 +838,7 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
         {
           goto(stateA)
         }        
-        .elsewhen((re_reg && RegNext(counter) === U(readLatency)) || (we_reg && RegNext(counter) === U(writeLatency))){
+        .elsewhen((re_reg && (RegNext(counter) === U(readLatency))) || (we_reg && (RegNext(counter) === U(writeLatency)))){
           
           when(we_reg)
           {
@@ -874,10 +874,10 @@ class DataCache(val p : DataCacheConfig, mmuParameter : MemoryTranslatorBusParam
     val stateB = new State
 
     stateA //idle state
-      //.onEntry
-      //{
-      //  counter := 0
-      //}
+      .onEntry
+      {
+        counter := 0
+      }
       .whenIsActive 
       {
       when(we || re)

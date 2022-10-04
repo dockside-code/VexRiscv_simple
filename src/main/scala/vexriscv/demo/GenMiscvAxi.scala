@@ -42,7 +42,7 @@ object GenMiscvAxi{
                     ),
                     new DBusCachedPlugin(
                             config = new DataCacheConfig(
-                            cacheSize        = 131072,
+                            cacheSize        = 1024, //64KiB
                             bytePerLine      = 64,
                             wayCount         = 1,
                             addressWidth     = 32,
@@ -51,18 +51,18 @@ object GenMiscvAxi{
                             catchAccessError = false,
                             catchIllegal     = false,
                             catchUnaligned   = false,
-                            isRTMBased       = true,
-                            isSTTBased       = false
+                            isRTMBased       = false,
+                            isSTTBased       = true
                         ),
                             rtmConfig = new RTMConfig(
                             howManyShiftPerCycle = 1,//use lower - bounded (e.g. 0.33 instead of 0.34) literal value of 1/n
                             //how many word per line - consider each line is a RTM bundle of 32 tracks here, so line size affect trackLength
-                            howManyAccessPorts = 1, //how many accessports per track
-                            isRingTrack = false
+                            howManyAccessPorts = 4, //how many accessports per track
+                            isRingTrack = true
                         ),
                             sttConfig = new STTConfig(
                             readLatency = 2,
-                            writeLatency = 21 //default is high retension STTRAM
+                            writeLatency = 4 //default is mid retention STTRAM
                         ),
                             sramConfig = new SRAMConfig(
                             accessLatency = 2 //sram access latency
