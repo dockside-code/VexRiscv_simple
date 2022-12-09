@@ -5,17 +5,19 @@ This VexRiscv fork contains a data cache based on a latency accurate RTM model (
 
 ## How to Use This
 
+Install [SBT](https://www.scala-sbt.org/1.x/docs/Setup.html)
 Change into repo root dir  
 `cd [repo_root]`  
 Boot sbt  
 `sbt`  
-Compile verilog with config [GenMiscvAxi](./src/main/scala/vexriscv/demo/GenMiscvAxi.scala)  
+Compile verilog with config [GenMiscvAxi](./src/main/scala/vexriscv/demo/GenMiscvAxi.scala)
+[VexRiscv Repo](https://github.com/SpinalHDL/VexRiscv.git)  
 `runMain vexriscv.demo.GenMiscvAxi`  
 You can find the compiled verilog file in repo root dir.
 
 A few things to keep in mind:
 
-- Cached dbus plugins only work with mmus or pmps, if mmu is instantiated, a single D$ way cannt exceed 4KB.
+- Cached dbus plugins only work with mmus or pmps.
 - DBus and IBUS are instantiated to have a AXI port
 - AMOs, LRSCs, invalidates and exclusives are not supported in the [cache configs](https://github.com/dockside-code/VexRiscv_simple/blob/91e35f77d78431eb9063205d9a198c83738d79ad/src/main/scala/vexriscv/ip/DataCache.scala#L27)
 
